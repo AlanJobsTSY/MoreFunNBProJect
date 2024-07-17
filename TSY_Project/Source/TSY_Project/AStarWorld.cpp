@@ -38,70 +38,90 @@ void AAStarWorld::Execute()
 	//float BoxExtentSize=WorldExtent;
 	//float VoxelLength=VoxelSize;
 	//8个BoxExtent
-	FVector BoxExtent= FVector(WorldExtent.X,WorldExtent.Y,WorldExtent.Z);
-	FVector VoxelSize=FVector(VoxelLength.X,VoxelLength.Y,VoxelLength.Z);
-	DrawDebugBox(GetWorld(), ActorLocation, BoxExtent, FColor::Green, ShowTime==0?true:false, ShowTime, 0, 4);
+	DrawDebugBox(GetWorld(), ActorLocation, WorldExtent, FColor::Green, ShowTime==0?true:false, ShowTime, 0, 4);
 	//各个方向的体素格数量
-	int32 NumVoxelX=FMath::CeilToInt(WorldExtent.X*2/VoxelLength.X);
-	int32 NumVoxelY=FMath::CeilToInt(WorldExtent.Y*2/VoxelLength.Y);
-	int32 NumVoxelZ=FMath::CeilToInt(WorldExtent.Z*2/VoxelLength.Z);
+	NumVoxel.X=FMath::CeilToInt(WorldExtent.X*2/VoxelLength.X);
+	NumVoxel.Y=FMath::CeilToInt(WorldExtent.Y*2/VoxelLength.Y);
+	NumVoxel.Z=FMath::CeilToInt(WorldExtent.Z*2/VoxelLength.Z);
 	//体素格的起始位置
-	FVector StartLocation=ActorLocation-BoxExtent;
+	FVector StartLocation=ActorLocation-WorldExtent;
 	//判断Voxel是否可通过
 
 	// 如果VoxelGrid尚未初始化,重新生成VoxelGrid
 	if (VoxelGrid.Num() == 0)
 	{
 		//判断Voxel是否可通过
-		VoxelGrid.SetNum(NumVoxelX*NumVoxelY*NumVoxelZ);
+		VoxelGrid.SetNum(NumVoxel.X*NumVoxel.Y*NumVoxel.Z);
 		//体素化
-		VoxelProcess(NumVoxelX,NumVoxelY,NumVoxelZ,StartLocation,VoxelSize);
+		VoxelProcess(StartLocation);
 	}
 	
 	//初始化起点
-	int32 StartX=(SearchBegin.X+ActorLocation.X-StartLocation.X)/VoxelLength.X,StartY=(SearchBegin.Y+ActorLocation.Y-StartLocation.Y)/VoxelLength.Y,StartZ=(SearchBegin.Z+ActorLocation.Z-StartLocation.Z)/VoxelLength.Z;
+	Start = TransferLocationToCellPosition(SearchBegin);
 	
 	//初始化终点
-	int32 EndX = (SearchEnd.X+ActorLocation.X-StartLocation.X)/VoxelLength.X,EndY = (SearchEnd.Y+ActorLocation.Y-StartLocation.Y)/VoxelLength.Y,EndZ = (SearchEnd.Z+ActorLocation.Z-StartLocation.Z)/VoxelLength.Z;
+	End = TransferLocationToCellPosition(SearchEnd);
 	
 	//判读是否非法起点和终点
-	if(!(StartX>=0&&StartX<NumVoxelX&&StartY>=0&&StartY<NumVoxelY&&StartZ>=0&&StartZ<NumVoxelZ&&EndX>=0&&EndX<NumVoxelX&&EndY>=0&&EndY<NumVoxelY&&EndZ>=0&&EndZ<NumVoxelZ))
+	if(!(Start.X>=0&&Start.X<NumVoxel.X&&Start.Y>=0&&Start.Y<NumVoxel.Y&&Start.Z>=0&&Start.Z<NumVoxel.Z))
 	{
-		UE_LOG(LogTemp,Warning,TEXT("Error, Your Start and End points must be within the specified range, otherwise default start and end points will be created."));
-		StartX=0,StartY=0,StartZ=0;
-		EndX=NumVoxelX-1,EndY=NumVoxelY-1,EndZ=NumVoxelZ-1;
+		UE_LOG(LogTemp,Warning,TEXT("Error, Your Start points must be within the specified range, otherwise default start and end points will be created."));
+		Start.X=0,Start.Y=0,Start.Z=0;
 	}
-	if(VoxelGrid[StartX*NumVoxelY*NumVoxelZ+StartY*NumVoxelZ+StartZ]==1||VoxelGrid[EndX*NumVoxelY*NumVoxelZ+EndY*NumVoxelZ+EndZ]==1)
+	if(!(End.X>=0&&End.X<NumVoxel.X&&End.Y>=0&&End.Y<NumVoxel.Y&&End.Z>=0&&End.Z<NumVoxel.Z))
 	{
-		UE_LOG(LogTemp,Warning,TEXT("Error, You cannot choose to start or end at an obstacle."));
-		return;
+		UE_LOG(LogTemp,Warning,TEXT("Error, Your End points must be within the specified range, otherwise default start and end points will be created."));
+		End.X=NumVoxel.X-1,End.Y=NumVoxel.Y-1,End.Z=NumVoxel.Z-1;
 	}
-	FVector StartCenter=StartLocation+FVector(StartX*VoxelLength.X+VoxelLength.X/2,StartY*VoxelLength.Y+VoxelLength.Y/2,StartZ*VoxelLength.Z+VoxelLength.Z/2);
-	FVector EndCenter = StartLocation + FVector(EndX*VoxelLength.X+VoxelLength.X/2,EndY*VoxelLength.Y+VoxelLength.Y/2,EndZ*VoxelLength.Z+VoxelLength.Z/2);
-	DrawDebugBox(GetWorld(), StartCenter, VoxelSize / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
-	DrawDebugBox(GetWorld(), EndCenter, VoxelSize / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
+	if(VoxelGrid[Start.X*NumVoxel.Y*NumVoxel.Z+Start.Y*NumVoxel.Z+Start.Z]==1)
+	{
+		UE_LOG(LogTemp,Warning,TEXT("Error, You cannot choose to start at an obstacle."));
+		Start.X=0,Start.Y=0,Start.Z=0;
+	}
+	if(VoxelGrid[End.X*NumVoxel.Y*NumVoxel.Z+End.Y*NumVoxel.Z+End.Z]==1)
+	{
+		UE_LOG(LogTemp,Warning,TEXT("Error, You cannot choose to end at an obstacle."));
+		End.X=NumVoxel.X-1,End.Y=NumVoxel.Y-1,End.Z=NumVoxel.Z-1;
+	}
+	FVector StartCenter=CalcPointCenter(StartLocation,Start.X,Start.Y,Start.Z);
+	FVector EndCenter = CalcPointCenter(StartLocation,End.X,End.Y,End.Z);
+	DrawDebugBox(GetWorld(), StartCenter, VoxelLength / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
+	DrawDebugBox(GetWorld(), EndCenter, VoxelLength / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
 	
 	//初始化启发数组
-	std::vector<std::vector<std::vector<float>>>H(NumVoxelX,std::vector<std::vector<float>>(NumVoxelY,std::vector<float>(NumVoxelZ,0)));
-	
-	for (int32 X = 0; X < NumVoxelX; X++)
+	TArray<TArray<TArray<float>>> H;
+	H.SetNum(NumVoxel.X);
+	for (int32 i = 0; i < NumVoxel.X; ++i)
 	{
-		for (int32 Y = 0; Y < NumVoxelY; Y++)
+		H[i].SetNum(NumVoxel.Y);
+		for (int32 j = 0; j < NumVoxel.Y; ++j)
 		{
-			for (int32 Z = 0; Z < NumVoxelZ; Z++)
+			H[i][j].SetNum(NumVoxel.Z);
+			for (int32 k = 0; k < NumVoxel.Z; ++k)
+			{
+				H[i][j][k] = 0;
+			}
+		}
+	}
+	
+	for (int32 X = 0; X < NumVoxel.X; X++)
+	{
+		for (int32 Y = 0; Y < NumVoxel.Y; Y++)
+		{
+			for (int32 Z = 0; Z < NumVoxel.Z; Z++)
 			{
 				//使用欧式距离作为启发函数
-				H[X][Y][Z]=sqrt((X-EndX)*(X-EndX)+(Y-EndY)*(Y-EndY)+(Z-EndZ)*(Z-EndZ));
+				H[X][Y][Z]=FMath::Sqrt(FMath::Square(X-End.X)+FMath::Square(Y-End.Y)+FMath::Square(Z-End.Z));
 			}
 		}
 	}
 
 	// 搜索开始时获取当前时间
 	double StartTime = FPlatformTime::Seconds();
-	int flag=0;
+	int Flag=0;
 	//A star
-	AStarAlgorithm(NumVoxelX,NumVoxelY,NumVoxelZ,StartX,StartY,StartZ,EndX,EndY,EndZ,flag,StartLocation,H);
-	if(flag==0)
+	AStarAlgorithm(Flag,StartLocation,H);
+	if(Flag==0)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Cannot find a way from start to end."));
 		return;
@@ -120,24 +140,22 @@ void AAStarWorld::Test()
 	//箱体大小和体素单元格大小
 	//float BoxExtentSize=WorldExtent;
 	//float VoxelLength=VoxelSize;
-	//8个BoxExtent
-	FVector BoxExtent= FVector(WorldExtent.X,WorldExtent.Y,WorldExtent.Z);
-	FVector VoxelSize=FVector(VoxelLength.X,VoxelLength.Y,VoxelLength.Z);
-	DrawDebugBox(GetWorld(), ActorLocation, BoxExtent, FColor::Green, ShowTime==0?true:false, ShowTime, 0, 4);
+
+	DrawDebugBox(GetWorld(), ActorLocation, WorldExtent, FColor::Green, ShowTime==0?true:false, ShowTime, 0, 4);
 	//各个方向的体素格数量
-	int32 NumVoxelX=FMath::CeilToInt(WorldExtent.X*2/VoxelLength.X);
-	int32 NumVoxelY=FMath::CeilToInt(WorldExtent.Y*2/VoxelLength.Y);
-	int32 NumVoxelZ=FMath::CeilToInt(WorldExtent.Z*2/VoxelLength.Z);
+	NumVoxel.X=FMath::CeilToInt(WorldExtent.X*2/VoxelLength.X);
+	NumVoxel.Y=FMath::CeilToInt(WorldExtent.Y*2/VoxelLength.Y);
+	NumVoxel.Z=FMath::CeilToInt(WorldExtent.Z*2/VoxelLength.Z);
 	//体素格的起始位置
-	FVector StartLocation=ActorLocation-BoxExtent;
-	FVector EndLocation=ActorLocation+BoxExtent;
+	FVector StartLocation=ActorLocation-WorldExtent;
+	FVector EndLocation=ActorLocation+WorldExtent;
 	
 	if (VoxelGrid.Num() == 0)
 	{
 		//判断Voxel是否可通过
-		VoxelGrid.SetNum(NumVoxelX*NumVoxelY*NumVoxelZ);
+		VoxelGrid.SetNum(NumVoxel.X*NumVoxel.Y*NumVoxel.Z);
 		//体素化
-		VoxelProcess(NumVoxelX,NumVoxelY,NumVoxelZ,StartLocation,VoxelSize);
+		VoxelProcess(StartLocation);
 	}
 	
 	double TotalStartTime = FPlatformTime::Seconds();
@@ -147,50 +165,70 @@ void AAStarWorld::Test()
 		UE_LOG(LogTemp,Warning,TEXT("TestCase: %d"),TestTime-Test);
 
 		//初始化起点
-		int32 StartX=(FMath::FRandRange(StartLocation.X, EndLocation.X)-StartLocation.X)/VoxelLength.X, StartY= (FMath::FRandRange(StartLocation.Y, EndLocation.Y)-StartLocation.Y)/VoxelLength.Y,StartZ = (FMath::FRandRange(StartLocation.Z, EndLocation.Z)-StartLocation.Z)/VoxelLength.Z;
+		Start=GenerateRandomCellPosition(StartLocation,EndLocation);
 	
 		//初始化终点
-		int32 EndX = (FMath::FRandRange(StartLocation.X, EndLocation.X)-StartLocation.X)/VoxelLength.X, EndY = (FMath::FRandRange(StartLocation.Y, EndLocation.Y)-StartLocation.Y)/VoxelLength.Y,EndZ = (FMath::FRandRange(StartLocation.Z, EndLocation.Z)-StartLocation.Z)/VoxelLength.Z;
-	
-
+		End=GenerateRandomCellPosition(StartLocation,EndLocation);
+		
 		//判读是否非法起点和终点
-		if(!(StartX>=0&&StartX<NumVoxelX&&StartY>=0&&StartY<NumVoxelY&&StartZ>=0&&StartZ<NumVoxelZ&&EndX>=0&&EndX<NumVoxelX&&EndY>=0&&EndY<NumVoxelY&&EndZ>=0&&EndZ<NumVoxelZ))
+		if(!(Start.X>=0&&Start.X<NumVoxel.X&&Start.Y>=0&&Start.Y<NumVoxel.Y&&Start.Z>=0&&Start.Z<NumVoxel.Z))
 		{
-			UE_LOG(LogTemp,Warning,TEXT("Error, Your Start and End points must be within the specified range, otherwise default start and end points will be created."));
-			StartX=0,StartY=0,StartZ=0;
-			EndX=NumVoxelX-1,EndY=NumVoxelY-1,EndZ=NumVoxelZ-1;
+			UE_LOG(LogTemp,Warning,TEXT("Error, Your Start points must be within the specified range, otherwise default start and end points will be created."));
+			Start.X=0,Start.Y=0,Start.Z=0;
 		}
-		if(VoxelGrid[StartX*NumVoxelY*NumVoxelZ+StartY*NumVoxelZ+StartZ]==1||VoxelGrid[EndX*NumVoxelY*NumVoxelZ+EndY*NumVoxelZ+EndZ]==1)
+		if(!(End.X>=0&&End.X<NumVoxel.X&&End.Y>=0&&End.Y<NumVoxel.Y&&End.Z>=0&&End.Z<NumVoxel.Z))
 		{
-			UE_LOG(LogTemp,Warning,TEXT("Error, You cannot choose to start or end at an obstacle."));
-			StartX=0,StartY=0,StartZ=0;
-			EndX=NumVoxelX-1,EndY=NumVoxelY-1,EndZ=NumVoxelZ-1;
+			UE_LOG(LogTemp,Warning,TEXT("Error, Your End points must be within the specified range, otherwise default start and end points will be created."));
+			End.X=NumVoxel.X-1,End.Y=NumVoxel.Y-1,End.Z=NumVoxel.Z-1;
 		}
-		FVector StartCenter=StartLocation + FVector(StartX*VoxelLength.X+VoxelLength.X/2,StartY*VoxelLength.Y+VoxelLength.Y/2,StartZ*VoxelLength.Z+VoxelLength.Z/2);
-		FVector EndCenter = StartLocation + FVector(EndX*VoxelLength.X+VoxelLength.X/2,EndY*VoxelLength.Y+VoxelLength.Y/2,EndZ*VoxelLength.Z+VoxelLength.Z/2);
-		//DrawDebugBox(GetWorld(), StartCenter, VoxelSize / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
-		//DrawDebugBox(GetWorld(), EndCenter, VoxelSize / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
+		if(VoxelGrid[Start.X*NumVoxel.Y*NumVoxel.Z+Start.Y*NumVoxel.Z+Start.Z]==1)
+		{
+			UE_LOG(LogTemp,Warning,TEXT("Error, You cannot choose to start at an obstacle."));
+			Start.X=0,Start.Y=0,Start.Z=0;
+		}
+		if(VoxelGrid[End.X*NumVoxel.Y*NumVoxel.Z+End.Y*NumVoxel.Z+End.Z]==1)
+		{
+			UE_LOG(LogTemp,Warning,TEXT("Error, You cannot choose to end at an obstacle."));
+			End.X=NumVoxel.X-1,End.Y=NumVoxel.Y-1,End.Z=NumVoxel.Z-1;
+		}
+		//FVector StartCenter=CalcPointCenter(StartLocation,Start.X,Start.Y,Start.Z);
+		//FVector EndCenter = CalcPointCenter(StartLocation,End.X,End.Y,End.Z);
+		//DrawDebugBox(GetWorld(), StartCenter, VoxelLength / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
+		//DrawDebugBox(GetWorld(), EndCenter, VoxelLength / 2,  FColor::Black, ShowTime==0?true:false, ShowTime, 0, 2);
 		//初始化启发数组
-		std::vector<std::vector<std::vector<float>>>H(NumVoxelX,std::vector<std::vector<float>>(NumVoxelY,std::vector<float>(NumVoxelZ,0)));
-	
-		for (int32 X = 0; X < NumVoxelX; X++)
+		TArray<TArray<TArray<float>>> H;
+		H.SetNum(NumVoxel.X);
+		for (int32 i = 0; i < NumVoxel.X; ++i)
 		{
-			for (int32 Y = 0; Y < NumVoxelY; Y++)
+			H[i].SetNum(NumVoxel.Y);
+			for (int32 j = 0; j < NumVoxel.Y; ++j)
 			{
-				for (int32 Z = 0; Z < NumVoxelZ; Z++)
+				H[i][j].SetNum(NumVoxel.Z);
+				for (int32 k = 0; k < NumVoxel.Z; ++k)
+				{
+					H[i][j][k] = 0;
+				}
+			}
+		}
+		
+		for (int32 X = 0; X < NumVoxel.X; X++)
+		{
+			for (int32 Y = 0; Y < NumVoxel.Y; Y++)
+			{
+				for (int32 Z = 0; Z < NumVoxel.Z; Z++)
 				{
 					//使用欧式距离作为启发函数
-					H[X][Y][Z]=sqrt((X-EndX)*(X-EndX)+(Y-EndY)*(Y-EndY)+(Z-EndZ)*(Z-EndZ));
+					H[X][Y][Z]=FMath::Sqrt(FMath::Square(X-End.X)+FMath::Square(Y-End.Y)+FMath::Square(Z-End.Z));
 				}
 			}
 		}
 
 		// 搜索开始时获取当前时间
 		double StartTime = FPlatformTime::Seconds();
-		int flag=0;
+		int Flag=0;
 		//A star
-		AStarAlgorithm(NumVoxelX,NumVoxelY,NumVoxelZ,StartX,StartY,StartZ,EndX,EndY,EndZ,flag,StartLocation,H);
-		if(flag==0)
+		AStarAlgorithm(Flag,StartLocation,H);
+		if(Flag==0)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Cannot find a way from start to end."));
 			return;
@@ -213,39 +251,52 @@ void AAStarWorld::DrawPath()
 	}
 }
 
-void AAStarWorld::AStarAlgorithm(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVoxelZ,int32 &StartX,int32 &StartY,int32 &StartZ,int32 &EndX,int32 &EndY,int32 &EndZ,int32 &flag,FVector &StartLocation,std::vector<std::vector<std::vector<float>>>&H)
+void AAStarWorld::AStarAlgorithm(int32& Flag,const FVector& StartLocation,const TArray<TArray<TArray<float>>> &H)
 {
-	FMapPoint* StartPoint=new FMapPoint(StartX,StartY,StartZ,0);
+	FMapPoint* StartPoint=new FMapPoint(Start.X,Start.Y,Start.Z,0);
 	std::priority_queue<FMapPoint*, std::vector<FMapPoint*>, CompareLength> Q;
 	Q.push(StartPoint);
 	
 	//防止访问重复起点
-	std::vector<std::vector<std::vector<int>>>Book(NumVoxelX,std::vector<std::vector<int>>(NumVoxelY,std::vector<int>(NumVoxelZ,0)));
-	Book[StartX][StartY][StartZ]=1;
+	TArray<TArray<TArray<float>>> Book;
+	Book.SetNum(NumVoxel.X);
+	for (int32 i = 0; i < NumVoxel.X; ++i)
+	{
+		Book[i].SetNum(NumVoxel.Y);
+		for (int32 j = 0; j < NumVoxel.Y; ++j)
+		{
+			Book[i][j].SetNum(NumVoxel.Z);
+			for (int32 k = 0; k < NumVoxel.Z; ++k)
+			{
+				Book[i][j][k] = 0;
+			}
+		}
+	}
+	Book[Start.X][Start.Y][Start.Z]=1;
 	while (!Q.empty())
 	{
 		FMapPoint* NowPoint=Q.top();
 		Q.pop();
-		if(NowPoint->X==EndX && NowPoint->Y==EndY && NowPoint->Z==EndZ)
+		if(NowPoint->X==End.X && NowPoint->Y==End.Y && NowPoint->Z==End.Z)
 		{
-			flag=1;
+			Flag=1;
 			UE_LOG(LogTemp, Warning, TEXT("Length: %f"), NowPoint->Length*VoxelLength.X);
 			if(bDrawLine)
 			{
-				FMapPoint* prevPoint = NowPoint;
-				FVector prevPointCenter = StartLocation + FVector(prevPoint->X * VoxelLength.X + VoxelLength.X / 2, prevPoint->Y * VoxelLength.Y + VoxelLength.Y / 2, prevPoint->Z * VoxelLength.Z + VoxelLength.Z / 2);
+				FMapPoint* PrevPoint = NowPoint;
+				FVector PrevPointCenter = CalcPointCenter(StartLocation,PrevPoint->X,PrevPoint->Y,PrevPoint->Z);
 				Path.Empty();
-				Path.Add(prevPointCenter);
+				Path.Add(PrevPointCenter);
 				while (NowPoint->Front != nullptr) {
 					NowPoint = NowPoint->Front;
-					FVector NowPointCenter = StartLocation + FVector(NowPoint->X * VoxelLength.X + VoxelLength.X / 2, NowPoint->Y * VoxelLength.Y + VoxelLength.Y / 2, NowPoint->Z * VoxelLength.Z + VoxelLength.Z / 2);
+					FVector NowPointCenter =  CalcPointCenter(StartLocation,NowPoint->X,NowPoint->Y,NowPoint->Z);
 					// 绘制连接线
 #if WITH_EDITOR
-					//DrawDebugLine(GetWorld(), prevPointCenter, NowPointCenter, FColor::Purple, ShowTime==0?true:false, ShowTime, 0, 5);
-					DrawDebugDirectionalArrow(GetWorld(), NowPointCenter,prevPointCenter,  20.0f, FColor::Purple, ShowTime==0?true:false, ShowTime, 0, 5);
+					//DrawDebugLine(GetWorld(), PrevPointCenter, NowPointCenter, FColor::Purple, ShowTime==0?true:false, ShowTime, 0, 5);
+					DrawDebugDirectionalArrow(GetWorld(), NowPointCenter,PrevPointCenter,  20.0f, FColor::Purple, ShowTime==0?true:false, ShowTime, 0, 5);
 #endif
-					prevPointCenter = NowPointCenter;
-					Path.Add(prevPointCenter);
+					PrevPointCenter = NowPointCenter;
+					Path.Add(PrevPointCenter);
 				}
 			}
 			break;
@@ -259,10 +310,10 @@ void AAStarWorld::AStarAlgorithm(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVox
 					int NewX=NowPoint->X+DirX;
 					int NewY=NowPoint->Y+DirY;
 					int NewZ=NowPoint->Z+DirZ;
-					if(0<=NewX&&NewX<NumVoxelX&&0<=NewY&&NewY<NumVoxelY&&0<=NewZ&&NewZ<NumVoxelZ&&Book[NewX][NewY][NewZ]==0&&VoxelGrid[NewX*NumVoxelY*NumVoxelZ+NewY*NumVoxelZ+NewZ]==0)
+					if(0<=NewX&&NewX<NumVoxel.X&&0<=NewY&&NewY<NumVoxel.Y&&0<=NewZ&&NewZ<NumVoxel.Z&&Book[NewX][NewY][NewZ]==0&&VoxelGrid[NewX*NumVoxel.Y*NumVoxel.Z+NewY*NumVoxel.Z+NewZ]==0)
 					{
 						Book[NewX][NewY][NewZ]=1;
-						FMapPoint* NewPoint=new FMapPoint(NewX,NewY,NewZ,NowPoint->Length+sqrt(DirX*DirX+DirY*DirY+DirZ*DirZ)+H[NewX][NewY][NewZ]);
+						FMapPoint* NewPoint=new FMapPoint(NewX,NewY,NewZ,NowPoint->Length+FMath::Square(DirX*DirX+DirY*DirY+DirZ*DirZ)+H[NewX][NewY][NewZ]);
 						NewPoint->Front=NowPoint;
 						Q.push(NewPoint);
 					}
@@ -273,27 +324,27 @@ void AAStarWorld::AStarAlgorithm(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVox
 	}
 }
 
-void AAStarWorld::VoxelProcess(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVoxelZ,FVector &StartLocation,FVector &VoxelSize)
+void AAStarWorld::VoxelProcess(const FVector& StartLocation)
 {
 	// 忽略自身
 	FCollisionQueryParams CollisionParams;
 	CollisionParams.AddIgnoredActor(this); 
 	//TArray<FHitResult> OutHits;
-	for (int32 X = 0; X < NumVoxelX; X++)
+	for (int32 X = 0; X < NumVoxel.X; X++)
 	{
-		for (int32 Y = 0; Y < NumVoxelY; Y++)
+		for (int32 Y = 0; Y < NumVoxel.Y; Y++)
 		{
-			for (int32 Z = 0; Z < NumVoxelZ; Z++)
+			for (int32 Z = 0; Z < NumVoxel.Z; Z++)
 			{
-				FVector VoxelCenter=StartLocation+FVector(X*VoxelLength.X+VoxelLength.X/2,Y*VoxelLength.Y+VoxelLength.Y/2,Z*VoxelLength.Z+VoxelLength.Z/2);
+				FVector VoxelCenter=CalcPointCenter(StartLocation,X,Y,Z);
 				bool bIsOverlapping = GetWorld()->OverlapBlockingTestByChannel(
 					VoxelCenter,
 					FQuat::Identity,
 					ECC_WorldStatic,
-					FCollisionShape::MakeBox(VoxelSize / 2),
+					FCollisionShape::MakeBox(VoxelLength / 2),
 					CollisionParams
 				);
-				int32 Index=X*NumVoxelY*NumVoxelZ+Y*NumVoxelZ+Z;
+				int32 Index=X*NumVoxel.Y*NumVoxel.Z+Y*NumVoxel.Z+Z;
 				if(bIsOverlapping)
 				{
 					VoxelGrid[Index]=1;
@@ -309,10 +360,34 @@ void AAStarWorld::VoxelProcess(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVoxel
 				}
 				UE_LOG(LogTemp,Warning,TEXT("%d, %d, %d: %d"), X, Y, Z, VoxelGrid[Index]);
 				if(bDrawVoxel)
-					DrawDebugBox(GetWorld(), VoxelCenter, VoxelSize / 2, bIsOverlapping ? FColor::Red : FColor::Green, ShowTime==0?true:false, ShowTime, 0, 1);
+					DrawDebugBox(GetWorld(), VoxelCenter, VoxelLength / 2, bIsOverlapping ? FColor::Red : FColor::Green, ShowTime==0?true:false, ShowTime, 0, 1);
 			}
 		}
 	}
+}
+
+FIntVector AAStarWorld::TransferLocationToCellPosition(const FVector& InPos) const
+{
+	FVector Tmp = InPos + WorldExtent;
+	return {
+		static_cast<int32>(Tmp.X / VoxelLength.X),
+		static_cast<int32>(Tmp.Y / VoxelLength.Y),
+		static_cast<int32>(Tmp.Z / VoxelLength.Z)
+	};
+}
+
+FVector AAStarWorld::CalcPointCenter(const FVector& StartLocation, int32 X, int32 Y, int32 Z) const
+{
+	return StartLocation+FVector(X*VoxelLength.X+VoxelLength.X/2,Y*VoxelLength.Y+VoxelLength.Y/2,Z*VoxelLength.Z+VoxelLength.Z/2);
+}
+
+FIntVector AAStarWorld::GenerateRandomCellPosition(const FVector& StartLocation, const FVector& EndLocation) const
+{
+	int32 RandomX = (FMath::FRandRange(StartLocation.X, EndLocation.X) - StartLocation.X) / VoxelLength.X;
+	int32 RandomY = (FMath::FRandRange(StartLocation.Y, EndLocation.Y) - StartLocation.Y) / VoxelLength.Y;
+	int32 RandomZ = (FMath::FRandRange(StartLocation.Z, EndLocation.Z) - StartLocation.Z) / VoxelLength.Z;
+
+	return FIntVector(RandomX, RandomY, RandomZ);
 }
 
 void AAStarWorld::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
@@ -330,19 +405,15 @@ void AAStarWorld::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 		FVector ActorLocation=GetActorLocation();
 		UE_LOG(LogTemp,Warning,TEXT("ActorLocation at (%f, %f, %f)"), ActorLocation.X, ActorLocation.Y, ActorLocation.Z);
 		//箱体大小和体素单元格大小
-		//8个BoxExtent
-		FVector BoxExtent= FVector(WorldExtent.X,WorldExtent.Y,WorldExtent.Z);
-		FVector VoxelSize=FVector(VoxelLength.X,VoxelLength.Y,VoxelLength.Z);
-		DrawDebugBox(GetWorld(), ActorLocation, BoxExtent, FColor::Green, ShowTime==0?true:false, ShowTime, 0, 4);
+		DrawDebugBox(GetWorld(), ActorLocation, WorldExtent, FColor::Green, ShowTime==0?true:false, ShowTime, 0, 4);
 		//各个方向的体素格数量
-		int32 NumVoxelX=FMath::CeilToInt(WorldExtent.X*2/VoxelLength.X);
-		int32 NumVoxelY=FMath::CeilToInt(WorldExtent.Y*2/VoxelLength.Y);
-		int32 NumVoxelZ=FMath::CeilToInt(WorldExtent.Z*2/VoxelLength.Z);
+		NumVoxel.X=FMath::CeilToInt(WorldExtent.X*2/VoxelLength.X);
+		NumVoxel.Y=FMath::CeilToInt(WorldExtent.Y*2/VoxelLength.Y);
+		NumVoxel.Z=FMath::CeilToInt(WorldExtent.Z*2/VoxelLength.Z);
 		//体素格的起始位置
-		FVector StartLocation=ActorLocation-BoxExtent;
-		FVector EndLocation=ActorLocation+BoxExtent;
-		VoxelGrid.SetNum(NumVoxelX*NumVoxelY*NumVoxelZ);
-		VoxelProcess(NumVoxelX,NumVoxelY,NumVoxelZ,StartLocation,VoxelSize);
+		FVector StartLocation=ActorLocation-WorldExtent;
+		VoxelGrid.SetNum(NumVoxel.X*NumVoxel.Y*NumVoxel.Z);
+		VoxelProcess(StartLocation);
 	}
 }
 
@@ -356,19 +427,17 @@ void AAStarWorld::PostEditMove(bool bFinished)
 		FlushPersistentDebugLines(GetWorld());
 		FVector ActorLocation = GetActorLocation();
 		UE_LOG(LogTemp, Warning, TEXT("ActorLocation at (%f, %f, %f)"), ActorLocation.X, ActorLocation.Y, ActorLocation.Z);
+		
+		DrawDebugBox(GetWorld(), ActorLocation, WorldExtent, FColor::Green, ShowTime == 0 ? true : false, ShowTime, 0, 4);
 
-		FVector BoxExtent = FVector(WorldExtent.X, WorldExtent.Y, WorldExtent.Z);
-		FVector VoxelSize = FVector(VoxelLength.X, VoxelLength.Y, VoxelLength.Z);
-		DrawDebugBox(GetWorld(), ActorLocation, BoxExtent, FColor::Green, ShowTime == 0 ? true : false, ShowTime, 0, 4);
+		NumVoxel.X = FMath::CeilToInt(WorldExtent.X * 2 / VoxelLength.X);
+		NumVoxel.Y = FMath::CeilToInt(WorldExtent.Y * 2 / VoxelLength.Y);
+		NumVoxel.Z = FMath::CeilToInt(WorldExtent.Z * 2 / VoxelLength.Z);
 
-		int32 NumVoxelX = FMath::CeilToInt(WorldExtent.X * 2 / VoxelLength.X);
-		int32 NumVoxelY = FMath::CeilToInt(WorldExtent.Y * 2 / VoxelLength.Y);
-		int32 NumVoxelZ = FMath::CeilToInt(WorldExtent.Z * 2 / VoxelLength.Z);
+		FVector StartLocation = ActorLocation - WorldExtent;
 
-		FVector StartLocation = ActorLocation - BoxExtent;
-		FVector EndLocation = ActorLocation + BoxExtent;
-		VoxelGrid.SetNum(NumVoxelX * NumVoxelY * NumVoxelZ);
-		VoxelProcess(NumVoxelX, NumVoxelY, NumVoxelZ, StartLocation, VoxelSize);
+		VoxelGrid.SetNum(NumVoxel.X * NumVoxel.Y * NumVoxel.Z);
+		VoxelProcess(StartLocation);
 		LastActorLocation = CurrentLocation;
 	}
 }
