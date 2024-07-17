@@ -4,24 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include <vector>
 #include "AStarWorld.generated.h"
-/*
-USTRUCT()
-struct FVoxelGridIndex
-{
-	GENERATED_BODY()
 
-	UPROPERTY()
-	int32 XIndex;
-
-	UPROPERTY()
-	int32 YIndex;
-
-	UPROPERTY()
-	int32 ZIndex;
-};
-*/
 UCLASS()
 class TSY_PROJECT_API AAStarWorld : public AActor
 {
@@ -64,13 +48,20 @@ public:
 	UFUNCTION(CallInEditor)
 	void DrawPath();
 
-	void AStarAlgorithm(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVoxelZ,int32 &StartX,int32 &StartY,int32 &StartZ,int32 &EndX,int32 &EndY,int32 &EndZ,int32 &flag,FVector &StartLocation,std::vector<std::vector<std::vector<float>>>&H);
+	void AStarAlgorithm(int32 &Flag,const FVector& StartLocation,const TArray<TArray<TArray<float>>> &H);
 	
-	void VoxelProcess(int32 &NumVoxelX,int32 &NumVoxelY,int32 &NumVoxelZ,FVector &StartLocation,FVector &VoxelSize);
+	void VoxelProcess(const FVector& StartLocation);
+
+	FIntVector TransferLocationToCellPosition(const FVector& InPos) const;
+
+	FVector CalcPointCenter(const FVector& StartLocation,int32 X,int32 Y,int32 Z) const;
+	
+	FIntVector GenerateRandomCellPosition(const FVector& StartLocation,const FVector& EndLocation) const;
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 	virtual void PostEditMove(bool bFinished) override;
+
 
 	
 protected:
@@ -98,6 +89,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Config")
 	bool bDrawLine;
 	
+	
 	UPROPERTY()
 	TArray<int32> VoxelGrid;
 	
@@ -105,5 +97,8 @@ protected:
 	TArray<FVector> Path;
 
 private:
-	FVector LastActorLocation=FVector::ZeroVector;;
+	FIntVector NumVoxel=FIntVector::ZeroValue;
+	FIntVector Start=FIntVector::ZeroValue;
+	FIntVector End=FIntVector::ZeroValue;
+	FVector LastActorLocation=FVector::ZeroVector;
 };
