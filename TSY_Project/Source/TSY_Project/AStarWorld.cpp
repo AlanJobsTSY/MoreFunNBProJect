@@ -49,6 +49,7 @@ void AAStarWorld::Execute() {
 	// 初始化终点
 	End = TransferLocationToCellPosition(SearchEnd);
 
+	// 不能生成在障碍物中
 	if(VoxelGrid[Start.X * NumVoxel.Y * NumVoxel.Z + Start.Y * NumVoxel.Z + Start.Z] == 1) {
 		UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to start at an obstacle."));
 		Start.X = 0, Start.Y = 0, Start.Z = 0;
@@ -79,7 +80,7 @@ void AAStarWorld::Execute() {
 		for(int32 Y = 0; Y < NumVoxel.Y; Y++) {
 			for(int32 Z = 0; Z < NumVoxel.Z; Z++) {
 				// 使用欧式距离作为启发函数
-				H[X][Y][Z] = FMath::Sqrt(FMath::Square(X - End.X) + FMath::Square(Y - End.Y) + FMath::Square(Z - End.Z));
+				H[X][Y][Z] = FMath::Sqrt(FMath::Square((X - End.X) * VoxelLength.X) + FMath::Square((Y - End.Y) * VoxelLength.Y) + FMath::Square((Z - End.Z) * VoxelLength.Z));
 			}
 		}
 	}
@@ -131,7 +132,7 @@ void AAStarWorld::Test() {
 		// 初始化终点
 		End = GenerateRandomCellPosition(StartLocation, EndLocation);
 
-		// 判读是否非法起点和终点
+		// 不能生成在障碍物中
 		if(VoxelGrid[Start.X * NumVoxel.Y * NumVoxel.Z + Start.Y * NumVoxel.Z + Start.Z] == 1) {
 			UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to start at an obstacle."));
 			Start.X = 0, Start.Y = 0, Start.Z = 0;
@@ -193,7 +194,7 @@ void AAStarWorld::DrawPath() {
 }
 
 void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, const TArray< TArray< TArray< float > > > &H) {
-	FMapPoint *StartPoint = new FMapPoint(Start.X, Start.Y, Start.Z, 0);
+	FMapPoint *StartPoint = new FMapPoint(Start.X, Start.Y, Start.Z, H[Start.X][Start.Y][Start.Z]);
 	// std::priority_queue<FMapPoint*, std::vector<FMapPoint*>, CompareLength> Q;
 	// Q.push(StartPoint);
 	TArray< FMapPoint * > Queue;
@@ -248,7 +249,10 @@ void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, cons
 					if(0 <= NewX && NewX < NumVoxel.X && 0 <= NewY && NewY < NumVoxel.Y && 0 <= NewZ && NewZ < NumVoxel.Z && Book[NewX][NewY][NewZ] == false && VoxelGrid[NewX * NumVoxel.Y * NumVoxel.Z + NewY * NumVoxel.Z + NewZ] == 0) {
 						// 防止重复访问
 						Book[NewX][NewY][NewZ] = true;
-						FMapPoint *NewPoint	   = new FMapPoint(NewX, NewY, NewZ, NowPoint->Length + FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z)) + H[NewX][NewY][NewZ]);
+						float test1=H[NowPoint->X][NowPoint->Y][NowPoint->Z];
+						float test2= FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z));
+						float test3=H[NewX][NewY][NewZ];
+						FMapPoint *NewPoint	   = new FMapPoint(NewX, NewY, NewZ, NowPoint->Length - H[NowPoint->X][NowPoint->Y][NowPoint->Z]+ FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z)) + H[NewX][NewY][NewZ]);
 						NewPoint->Front		   = NowPoint;
 						// Q.push(NewPoint);
 						Queue.HeapPush(NewPoint, CompareLength());
