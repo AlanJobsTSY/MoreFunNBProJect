@@ -132,14 +132,6 @@ void AAStarWorld::Test() {
 		End = GenerateRandomCellPosition(StartLocation, EndLocation);
 
 		// 判读是否非法起点和终点
-		if(!(Start.X >= 0 && Start.X < NumVoxel.X && Start.Y >= 0 && Start.Y < NumVoxel.Y && Start.Z >= 0 && Start.Z < NumVoxel.Z)) {
-			UE_LOG(LogTemp, Warning, TEXT("Error, Your Start points must be within the specified range, otherwise default start and end points will be created."));
-			Start.X = 0, Start.Y = 0, Start.Z = 0;
-		}
-		if(!(End.X >= 0 && End.X < NumVoxel.X && End.Y >= 0 && End.Y < NumVoxel.Y && End.Z >= 0 && End.Z < NumVoxel.Z)) {
-			UE_LOG(LogTemp, Warning, TEXT("Error, Your End points must be within the specified range, otherwise default start and end points will be created."));
-			End.X = NumVoxel.X - 1, End.Y = NumVoxel.Y - 1, End.Z = NumVoxel.Z - 1;
-		}
 		if(VoxelGrid[Start.X * NumVoxel.Y * NumVoxel.Z + Start.Y * NumVoxel.Z + Start.Z] == 1) {
 			UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to start at an obstacle."));
 			Start.X = 0, Start.Y = 0, Start.Z = 0;
