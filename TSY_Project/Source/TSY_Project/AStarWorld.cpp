@@ -249,9 +249,6 @@ void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, cons
 					if(0 <= NewX && NewX < NumVoxel.X && 0 <= NewY && NewY < NumVoxel.Y && 0 <= NewZ && NewZ < NumVoxel.Z && Book[NewX][NewY][NewZ] == false && VoxelGrid[NewX * NumVoxel.Y * NumVoxel.Z + NewY * NumVoxel.Z + NewZ] == 0) {
 						// 防止重复访问
 						Book[NewX][NewY][NewZ] = true;
-						float test1=H[NowPoint->X][NowPoint->Y][NowPoint->Z];
-						float test2= FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z));
-						float test3=H[NewX][NewY][NewZ];
 						FMapPoint *NewPoint	   = new FMapPoint(NewX, NewY, NewZ, NowPoint->Length - H[NowPoint->X][NowPoint->Y][NowPoint->Z]+ FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z)) + H[NewX][NewY][NewZ]);
 						NewPoint->Front		   = NowPoint;
 						// Q.push(NewPoint);
