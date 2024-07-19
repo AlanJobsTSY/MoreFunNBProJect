@@ -85,7 +85,7 @@ protected:
 
 	// 默认的体素单元大小
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
-	FVector VoxelLength = FVector(100.f, 100.f, 100.f);
+	FVector VoxelBox = FVector(100.f, 100.f, 100.f);
 
 	// 默认的搜索世界范围
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
@@ -128,4 +128,7 @@ private:
 
 	// 搜索终点的体素坐标
 	FIntVector End = FIntVector::ZeroValue;
+
+	// 障碍物数量
+	int32 BlockNum = 0;
 };
