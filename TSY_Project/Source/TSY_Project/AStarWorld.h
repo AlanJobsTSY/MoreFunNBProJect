@@ -65,6 +65,9 @@ public:
 	// 生成随机的起始点和终点
 	FIntVector GenerateRandomCellPosition(const FVector &StartLocation, const FVector &EndLocation) const;
 
+	// 将三维坐标降维为一维
+	int32 CellPositionToVoxelIndex(const FIntVector &CellPosition) const;
+
 	virtual void PostEditChangeProperty(FPropertyChangedEvent &PropertyChangedEvent) override;
 
 	virtual void PostEditMove(bool bFinished) override;

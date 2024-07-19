@@ -33,7 +33,6 @@ void AAStarWorld::Execute() {
 	NumVoxel.Z = FMath::CeilToInt(WorldExtent.Z * 2 / VoxelLength.Z);
 	// 体素格的起始位置
 	FVector StartLocation = ActorLocation - WorldExtent;
-	// 判断Voxel是否可通过
 
 	// 如果VoxelGrid尚未初始化,重新生成VoxelGrid
 	if(VoxelGrid.Num() == 0) {
@@ -50,16 +49,18 @@ void AAStarWorld::Execute() {
 	End = TransferLocationToCellPosition(SearchEnd);
 
 	// 不能生成在障碍物中
-	if(VoxelGrid[Start.X * NumVoxel.Y * NumVoxel.Z + Start.Y * NumVoxel.Z + Start.Z] == 1) {
+	if(VoxelGrid[CellPositionToVoxelIndex(Start)] == 1) {
 		UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to start at an obstacle."));
 		Start.X = 0, Start.Y = 0, Start.Z = 0;
 	}
-	if(VoxelGrid[End.X * NumVoxel.Y * NumVoxel.Z + End.Y * NumVoxel.Z + End.Z] == 1) {
+	if(VoxelGrid[CellPositionToVoxelIndex(End)] == 1) {
 		UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to end at an obstacle."));
 		End.X = NumVoxel.X - 1, End.Y = NumVoxel.Y - 1, End.Z = NumVoxel.Z - 1;
 	}
-	FVector StartCenter = TransferCellPositionToLocation(StartLocation, FIntVector(Start.X, Start.Y, Start.Z));
-	FVector EndCenter	= TransferCellPositionToLocation(StartLocation, FIntVector(End.X, End.Y, End.Z));
+
+	// 画出起点和终点的体素单元
+	FVector StartCenter = TransferCellPositionToLocation(StartLocation, FIntVector(Start));
+	FVector EndCenter	= TransferCellPositionToLocation(StartLocation, FIntVector(End));
 	DrawDebugBox(GetWorld(), StartCenter, VoxelLength / 2, FColor::Black, ShowTime == 0 ? true : false, ShowTime, 0, 2);
 	DrawDebugBox(GetWorld(), EndCenter, VoxelLength / 2, FColor::Black, ShowTime == 0 ? true : false, ShowTime, 0, 2);
 
@@ -133,17 +134,18 @@ void AAStarWorld::Test() {
 		End = GenerateRandomCellPosition(StartLocation, EndLocation);
 
 		// 不能生成在障碍物中
-		if(VoxelGrid[Start.X * NumVoxel.Y * NumVoxel.Z + Start.Y * NumVoxel.Z + Start.Z] == 1) {
+		if(VoxelGrid[CellPositionToVoxelIndex(Start)] == 1) {
 			UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to start at an obstacle."));
 			Start.X = 0, Start.Y = 0, Start.Z = 0;
 		}
-		if(VoxelGrid[End.X * NumVoxel.Y * NumVoxel.Z + End.Y * NumVoxel.Z + End.Z] == 1) {
+		if(VoxelGrid[CellPositionToVoxelIndex(End)] == 1) {
 			UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to end at an obstacle."));
 			End.X = NumVoxel.X - 1, End.Y = NumVoxel.Y - 1, End.Z = NumVoxel.Z - 1;
 		}
 
-		FVector StartCenter = TransferCellPositionToLocation(StartLocation, FIntVector(Start.X, Start.Y, Start.Z));
-		FVector EndCenter	= TransferCellPositionToLocation(StartLocation, FIntVector(End.X, End.Y, End.Z));
+		// 画出起点和终点的体素单元
+		FVector StartCenter = TransferCellPositionToLocation(StartLocation, FIntVector(Start));
+		FVector EndCenter	= TransferCellPositionToLocation(StartLocation, FIntVector(End));
 		DrawDebugBox(GetWorld(), StartCenter, VoxelLength / 2, FColor::Black, ShowTime == 0 ? true : false, ShowTime, 0, 2);
 		DrawDebugBox(GetWorld(), EndCenter, VoxelLength / 2, FColor::Black, ShowTime == 0 ? true : false, ShowTime, 0, 2);
 
@@ -184,7 +186,7 @@ void AAStarWorld::Test() {
 		UE_LOG(LogTemp, Warning, TEXT("Search time: %f seconds"), SearchTime);
 	}
 	double TotalEndTime = FPlatformTime::Seconds();
-	UE_LOG(LogTemp, Warning, TEXT("\n\nTotal Search time: %f seconds"), TotalEndTime - TotalStartTime);
+	UE_LOG(LogTemp, Warning, TEXT("Total Search time: %f seconds"), TotalEndTime - TotalStartTime);
 }
 
 void AAStarWorld::DrawPath() {
@@ -246,10 +248,10 @@ void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, cons
 					int NewX = NowPoint->X + DirX;
 					int NewY = NowPoint->Y + DirY;
 					int NewZ = NowPoint->Z + DirZ;
-					if(0 <= NewX && NewX < NumVoxel.X && 0 <= NewY && NewY < NumVoxel.Y && 0 <= NewZ && NewZ < NumVoxel.Z && Book[NewX][NewY][NewZ] == false && VoxelGrid[NewX * NumVoxel.Y * NumVoxel.Z + NewY * NumVoxel.Z + NewZ] == 0) {
+					if(0 <= NewX && NewX < NumVoxel.X && 0 <= NewY && NewY < NumVoxel.Y && 0 <= NewZ && NewZ < NumVoxel.Z && Book[NewX][NewY][NewZ] == false && VoxelGrid[CellPositionToVoxelIndex(FIntVector(NewX, NewY, NewZ))] == 0) {
 						// 防止重复访问
 						Book[NewX][NewY][NewZ] = true;
-						FMapPoint *NewPoint	   = new FMapPoint(NewX, NewY, NewZ, NowPoint->Length - H[NowPoint->X][NowPoint->Y][NowPoint->Z]+ FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z)) + H[NewX][NewY][NewZ]);
+						FMapPoint *NewPoint	   = new FMapPoint(NewX, NewY, NewZ, NowPoint->Length - H[NowPoint->X][NowPoint->Y][NowPoint->Z] + FMath::Sqrt(FMath::Square(DirX * VoxelLength.X) + FMath::Square(DirY * VoxelLength.Y) + FMath::Square(DirZ * VoxelLength.Z)) + H[NewX][NewY][NewZ]);
 						NewPoint->Front		   = NowPoint;
 						// Q.push(NewPoint);
 						Queue.HeapPush(NewPoint, CompareLength());
@@ -275,13 +277,12 @@ void AAStarWorld::VoxelProcess(const FVector &StartLocation) {
 					FCollisionShape::MakeBox(VoxelLength / 2),
 					CollisionParams);
 				// 通过坐标降维将三维转为一维
-				int32 Index = X * NumVoxel.Y * NumVoxel.Z + Y * NumVoxel.Z + Z;
 				if(bIsOverlapping) {
-					VoxelGrid[Index] = 1;
+					VoxelGrid[CellPositionToVoxelIndex(FIntVector(X, Y, Z))] = 1;
 				} else {
-					VoxelGrid[Index] = 0;
+					VoxelGrid[CellPositionToVoxelIndex(FIntVector(X, Y, Z))] = 0;
 				}
-				UE_LOG(LogTemp, Warning, TEXT("%d, %d, %d: %d"), X, Y, Z, VoxelGrid[Index]);
+				UE_LOG(LogTemp, Warning, TEXT("%d, %d, %d: %d"), X, Y, Z, VoxelGrid[CellPositionToVoxelIndex(FIntVector(X, Y, Z))]);
 				if(bDrawVoxel)
 					DrawDebugBox(GetWorld(), VoxelCenter, VoxelLength / 2, bIsOverlapping ? FColor::Red : FColor::Green, ShowTime == 0 ? true : false, ShowTime, 0, 1);
 			}
@@ -310,6 +311,10 @@ FIntVector AAStarWorld::GenerateRandomCellPosition(const FVector &StartLocation,
 		FMath::Clamp(static_cast< int32 >((FMath::FRandRange(StartLocation.Z, EndLocation.Z) - StartLocation.Z) / VoxelLength.Z), 0, NumVoxel.Z - 1)
 
 	};
+}
+
+int32 AAStarWorld::CellPositionToVoxelIndex(const FIntVector &CellPosition) const {
+	return CellPosition.X * NumVoxel.Y * NumVoxel.Z + CellPosition.Y * NumVoxel.Z + CellPosition.Z;
 }
 
 void AAStarWorld::PostEditChangeProperty(FPropertyChangedEvent &PropertyChangedEvent) {
