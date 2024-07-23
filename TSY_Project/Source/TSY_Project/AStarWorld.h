@@ -51,7 +51,7 @@ public:
 	void DrawPath();
 
 	// A*
-	void AStarAlgorithm(int32 &Flag, const FVector &StartLocation, const TArray< TArray< TArray< float > > > &H);
+	void AStarAlgorithm(int32 &Flag, const FVector &StartLocation, const TArray< TArray< TArray< float > > > &H, TArray< TArray< TArray< bool > > > &Book);
 
 	// 体素化
 	void VoxelProcess(const FVector &StartLocation);

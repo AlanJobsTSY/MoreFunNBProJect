@@ -42,12 +42,13 @@ void AAStarWorld::Execute() {
 		VoxelProcess(StartLocation);
 	}
 
+	double InitStartTime = FPlatformTime::Seconds();
 	// 初始化起点
 	Start = TransferLocationToCellPosition(SearchBegin);
-
+	//Start=FIntVector(0,0,0);
 	// 初始化终点
 	End = TransferLocationToCellPosition(SearchEnd);
-
+	//End=FIntVector(NumVoxel.X - 1,NumVoxel.Y - 1,NumVoxel.Z - 1);
 	// 不能生成在障碍物中
 	if(VoxelGrid[CellPositionToVoxelIndex(Start)] == 1) {
 		UE_LOG(LogTemp, Warning, TEXT("Error, You cannot choose to start at an obstacle."));
@@ -86,11 +87,26 @@ void AAStarWorld::Execute() {
 		}
 	}
 
-	// 搜索开始时获取当前时间
-	double StartTime = FPlatformTime::Seconds();
+	
 	int Flag		 = 0;
 	// A star
-	AStarAlgorithm(Flag, StartLocation, H);
+	// 防止访问重复起点
+	TArray< TArray< TArray< bool > > > Book;
+	Book.SetNum(NumVoxel.X);
+	for(int32 i = 0; i < NumVoxel.X; ++i) {
+		Book[i].SetNum(NumVoxel.Y);
+		for(int32 j = 0; j < NumVoxel.Y; ++j) {
+			Book[i][j].SetNum(NumVoxel.Z);
+			for(int32 k = 0; k < NumVoxel.Z; ++k) {
+				Book[i][j][k] = 0;
+			}
+		}
+	}
+	Book[Start.X][Start.Y][Start.Z] = 1;
+	double InitEndTime = FPlatformTime::Seconds();
+	// 搜索开始时获取当前时间
+	double StartTime = FPlatformTime::Seconds();
+	AStarAlgorithm(Flag, StartLocation, H, Book);
 	if(Flag == 0) {
 		UE_LOG(LogTemp, Warning, TEXT("Cannot find a way from start to end."));
 		//return;
@@ -99,6 +115,7 @@ void AAStarWorld::Execute() {
 	double EndTime	  = FPlatformTime::Seconds();
 	double SearchTime = EndTime - StartTime;
 	UE_LOG(LogTemp, Warning, TEXT("BlockNum: %d"), BlockNum);
+	UE_LOG(LogTemp, Warning, TEXT("Init time: %f seconds"), InitEndTime-InitStartTime);
 	UE_LOG(LogTemp, Warning, TEXT("Search time: %f seconds"), SearchTime);
 }
 
@@ -124,10 +141,12 @@ void AAStarWorld::Test() {
 	}
 
 	double TotalStartTime = FPlatformTime::Seconds();
+	double AverageInitTime = 0;
+	double AverageSearchTime = 0;
 	int32 Test			  = TestTime;
 	while(Test--) {
 		UE_LOG(LogTemp, Warning, TEXT("TestCase: %d"), TestTime - Test);
-
+		double AverageInitStartTime = FPlatformTime::Seconds();
 		// 初始化起点
 		Start = GenerateRandomCellPosition(StartLocation, EndLocation);
 
@@ -172,11 +191,27 @@ void AAStarWorld::Test() {
 			}
 		}
 
-		// 搜索开始时获取当前时间
-		double StartTime = FPlatformTime::Seconds();
+		
 		int Flag		 = 0;
 		// A star
-		AStarAlgorithm(Flag, StartLocation, H);
+		// 防止访问重复起点
+		TArray< TArray< TArray< bool > > > Book;
+		Book.SetNum(NumVoxel.X);
+		for(int32 i = 0; i < NumVoxel.X; ++i) {
+			Book[i].SetNum(NumVoxel.Y);
+			for(int32 j = 0; j < NumVoxel.Y; ++j) {
+				Book[i][j].SetNum(NumVoxel.Z);
+				for(int32 k = 0; k < NumVoxel.Z; ++k) {
+					Book[i][j][k] = 0;
+				}
+			}
+		}
+		Book[Start.X][Start.Y][Start.Z] = 1;
+		double AverageInitEndTime = FPlatformTime::Seconds();
+		AverageInitTime += AverageInitEndTime - AverageInitStartTime;
+		// 搜索开始时获取当前时间
+		double StartTime = FPlatformTime::Seconds();
+		AStarAlgorithm(Flag, StartLocation, H, Book);
 		if(Flag == 0) {
 			UE_LOG(LogTemp, Warning, TEXT("Cannot find a way from start to end."));
 			//return;
@@ -184,10 +219,13 @@ void AAStarWorld::Test() {
 		// 搜索结束时获取当前时间
 		double EndTime	  = FPlatformTime::Seconds();
 		double SearchTime = EndTime - StartTime;
+		AverageSearchTime += SearchTime;
 		UE_LOG(LogTemp, Warning, TEXT("Search time: %f seconds"), SearchTime);
 	}
 	double TotalEndTime = FPlatformTime::Seconds();
 	UE_LOG(LogTemp, Warning, TEXT("BlockNum: %d"), BlockNum);
+	UE_LOG(LogTemp, Warning, TEXT("AverageInitTime: %f seconds"), AverageInitTime/TestTime);
+	UE_LOG(LogTemp, Warning, TEXT("AverageSearchTime: %f seconds"), AverageSearchTime/TestTime);
 	UE_LOG(LogTemp, Warning, TEXT("Total Search time: %f seconds"), TotalEndTime - TotalStartTime);
 }
 
@@ -197,25 +235,12 @@ void AAStarWorld::DrawPath() {
 	}
 }
 
-void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, const TArray< TArray< TArray< float > > > &H) {
+void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, const TArray< TArray< TArray< float > > > &H, TArray< TArray< TArray< bool > > > &Book) {
 	FMapPoint *StartPoint = new FMapPoint(Start.X, Start.Y, Start.Z, H[Start.X][Start.Y][Start.Z]);
 	// std::priority_queue<FMapPoint*, std::vector<FMapPoint*>, CompareLength> Q;
 	// Q.push(StartPoint);
 	TArray< FMapPoint * > Queue;
 	Queue.HeapPush(StartPoint, CompareLength());
-	// 防止访问重复起点
-	TArray< TArray< TArray< bool > > > Book;
-	Book.SetNum(NumVoxel.X);
-	for(int32 i = 0; i < NumVoxel.X; ++i) {
-		Book[i].SetNum(NumVoxel.Y);
-		for(int32 j = 0; j < NumVoxel.Y; ++j) {
-			Book[i][j].SetNum(NumVoxel.Z);
-			for(int32 k = 0; k < NumVoxel.Z; ++k) {
-				Book[i][j][k] = 0;
-			}
-		}
-	}
-	Book[Start.X][Start.Y][Start.Z] = 1;
 	// while (!Q.empty())
 	while(Queue.Num()) {
 		// FMapPoint* NowPoint=Q.top();
@@ -233,7 +258,7 @@ void AAStarWorld::AStarAlgorithm(int32 &Flag, const FVector &StartLocation, cons
 				while(NowPoint->Front != nullptr) {
 					NowPoint			   = NowPoint->Front;
 					FVector NowPointCenter = TransferCellPositionToLocation(StartLocation, FIntVector(NowPoint->X, NowPoint->Y, NowPoint->Z));
-					// 绘制连接线
+					// 绘制连接线 
 #if WITH_EDITOR
 					DrawDebugDirectionalArrow(GetWorld(), NowPointCenter, PrevPointCenter, 100.0f, FColor::Purple, ShowTime == 0 ? true : false, ShowTime, 0, 5);
 #endif
